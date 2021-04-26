@@ -141,7 +141,6 @@ class MainWindow(QWidget):
             worker = RunProcess(path=self.plan_path, python_cmd=self.config['GENERAL']['command'])
             worker.signals.signal.connect(self.append_text)
             self.stop_btn.clicked.connect(worker.terminate)
-            self.pause_btn.clicked.connect(worker.pause)
 
             self.threadpool.start(worker)
         
