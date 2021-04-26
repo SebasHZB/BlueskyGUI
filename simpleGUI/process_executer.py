@@ -1,20 +1,22 @@
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+import subprocess
+import signal
 
 class ProcessLine(QObject):
     signal = pyqtSignal(object)
 
 class RunProcess(QRunnable):
-    def __init__(self,*args,**kwargs):
-        QObject.__init__(self,*args, bluesky**kwargs)
+    def __init__(self,*args, path, python_cmd,**kwargs):
+        QObject.__init__(self,*args, **kwargs)
         self.signals = ProcessLine()
-        self.pause = False
+        self.command = python_cmd
+        self.path = path
 
     @pyqtSlot()
     def run(self):
-        command = 'python test_plan.py'
-        self.process = sp.Popen(command, stdout=sp.PIPE, stderr=sp.PIPE, universal_newlines=True)
+        self.start()
 
         # Poll process for new output until finished
         while True:
@@ -25,16 +27,28 @@ class RunProcess(QRunnable):
     
     def start(self):
         self.process = subprocess.Popen(
-            self.command,
+            (self.command, self.path),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True
         )
+        self.paused = False
 
 
     def read(self):
         self.signal.emit(self.process.stdout.readline())
+        
+    def write(self, msg):
+        self.process.stdin.write(msg)
+        
+    def pause(self):
+        if self.paused:
+            self.write('RE.resume()')
+            self.paused = False
+        else:
+            self.write("RE.pause()")
+            self.paused = True
 
 
     def terminate(self):

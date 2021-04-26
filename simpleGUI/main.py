@@ -29,11 +29,10 @@ from databroker import Broker
 from bluesky.callbacks import LivePlot, LiveTable
 import bluesky.plans as bp
 import matplotlib.pyplot as plt
-import subprocess
 import signal
 import configparser
 
-from simpleGUI import process_executer
+from simpleGUI.process_executer import RunProcess
 
 _EXPECTED_SECTIONS = ['GENERAL', 'PYTHON', 'LAYOUT']   
 
@@ -87,8 +86,8 @@ class MainWindow(QWidget):
         self.commit_btn = QtWidgets.QPushButton(self)
         self.commit_btn.setFixedHeight(80)
         self.layout.addWidget(self.commit_btn, 2, 2)
-        self.stop_btn.setFont(font)
-        self.stop_btn.setObjectName("stopButton")
+        self.commit_btn.setFont(font)
+        self.commit_btn.setObjectName("comitButton")
         
         self.plan_path = ''
         self.threadpool = QThreadPool()
@@ -104,7 +103,7 @@ class MainWindow(QWidget):
         self.plan_select.setText(_translate("Form", "Select Plan"))
         self.run_btn.setText(_translate("Form", "Start Plan"))
         self.stop_btn.setText(_translate("Form", "Abort Plan"))
-        self.commit_btn.setText(_translate("Form", "Commit to Runbook"))
+        self.commit_btn.setText(_translate("Form", "Commit"))
         
     def read_config(self):
         config = configparser.ConfigParser()
@@ -142,6 +141,7 @@ class MainWindow(QWidget):
             worker = RunProcess(path=self.plan_path, python_cmd=self.config['GENERAL']['command'])
             worker.signals.signal.connect(self.append_text)
             self.stop_btn.clicked.connect(worker.terminate)
+            self.pause_btn.clicked.connect(worker.pause)
 
             self.threadpool.start(worker)
         
