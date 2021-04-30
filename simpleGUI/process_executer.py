@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import subprocess
 import signal
+import re
 
 class ProcessLine(QObject):
     signal = pyqtSignal(object)
@@ -20,8 +21,9 @@ class RunProcess(QRunnable):
 
         # Poll process for new output until finished
         while True:
-            nextline = self.process.stdout.readline()
-            if nextline == '' and self.process.poll() is not None:
+            nextline = self.read()
+            print(nextline)
+            if nextline.decode()  == '' and self.process.poll() is not None:
                 break
             self.signals.signal.emit(nextline)
     
@@ -30,14 +32,19 @@ class RunProcess(QRunnable):
             (self.command, self.path),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True
+            stderr=subprocess.PIPE
         )
         self.paused = False
 
 
     def read(self):
-        self.signal.emit(self.process.stdout.readline())
+        nextline = self.process.stdout.readline()
+        ansi_escape_8bit = re.compile(
+            br'(?:\x1B[@-Z\\-_]|[\x80-\x9A\x9C-\x9F]|(?:\x1B\[|\x9B)[0-?]*[ -/]*[@-~])'
+        )
+        result = ansi_escape_8bit.sub(b'', nextline)
+        return result
+        
         
     def write(self, msg):
         self.process.stdin.write(msg)

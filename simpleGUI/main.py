@@ -31,8 +31,11 @@ import bluesky.plans as bp
 import matplotlib.pyplot as plt
 import signal
 import configparser
+from datetime import date
 
-from simpleGUI.process_executer import RunProcess
+from process_executer import RunProcess
+
+from bact.applib.elogwrapper import elogwrapper
 
 _EXPECTED_SECTIONS = ['GENERAL', 'PYTHON', 'LAYOUT']   
 
@@ -88,6 +91,7 @@ class MainWindow(QWidget):
         self.layout.addWidget(self.commit_btn, 2, 2)
         self.commit_btn.setFont(font)
         self.commit_btn.setObjectName("comitButton")
+        self.commit_btn.clicked.connect(self.commit)
         
         self.plan_path = ''
         self.threadpool = QThreadPool()
@@ -146,13 +150,28 @@ class MainWindow(QWidget):
         
     def append_text(self,text):
         self.output.moveCursor(QTextCursor.End)
+        msg = QTextCodec.codecForLocale().toUnicode(text)
         try:
-            self.output.insertPlainText( text )
+            self.output.insertPlainText( msg )
         except TypeError:
             print(text)
     
     def set_signal(self, value):
         self.testsignal.put(value)
+
+    def commit(self):
+        image_paths, ftypes = QFileDialog.getOpenFileNames(self, "Select Image File to append", "", "Image File (*.png)")
+
+        plotfiles = image_paths
+        
+        name = self.plan_name.text()
+
+        m_date = date.today().strftime("%b-%d-%Y")
+        
+        data = "Date: {}\n Measurement: {}\n".format(m_date, name)
+
+        elogwrapper.elog_BESSYII_automeas_section_create(name, name, data, plotfiles)
+        
     
 if __name__ == '__main__':
     app = 0
