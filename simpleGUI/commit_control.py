@@ -157,7 +157,7 @@ class Commit_Control(QMainWindow):
             
         print('Scan Name: {}\nAuthor: {}\nDescription: {}\nAttachments: {}'.format(name, author, description, attachments))
         
-        elogwrapper.elog_BESSYII_automeas_section_create(name, name, data, plotfiles)
+        elogwrapper.elog_BESSYII_automeas_section_create(name, author, description, attachments)
        
         
         
