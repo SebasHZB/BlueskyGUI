@@ -29,13 +29,15 @@ from databroker import Broker
 from bluesky.callbacks import LivePlot, LiveTable
 import bluesky.plans as bp
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import signal
 import configparser
 from datetime import date
 
-from process_executer import RunProcess
-
-from bact.applib.elogwrapper import elogwrapper
+#from process_executer import RunProcess
+from multiprocess_executer import RunProcess
+from commit_control import Commit_Control
 
 _EXPECTED_SECTIONS = ['GENERAL', 'PYTHON', 'LAYOUT']   
 
@@ -43,6 +45,8 @@ class MainWindow(QWidget):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)       
         self.config = self.read_config()
+        
+        bs.callbacks.mpl_plotting.initialize_qt_teleporter()
         
         width = int(self.config['LAYOUT']['window_width'])
         height = int(self.config['LAYOUT']['window_height'])
@@ -69,32 +73,40 @@ class MainWindow(QWidget):
         self.plan_select.setObjectName("planSelect")
         self.plan_select.clicked.connect(self.select_plan)
         
-        self.output = QtWidgets.QTextEdit(self)
-        self.layout.addWidget(self.output, 1, 0, 1, 3)
-        self.output.setObjectName("outputGraph")
+        #self.output = QtWidgets.QTextEdit(self)
+        #self.layout.addWidget(self.output, 1, 0, 1, 3)
+        #self.output.setObjectName("outputGraph")
+        
+        self.figure, self.axes = plt.subplots(1, 1, figsize=[12,8])
+        self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        self.layout.addWidget(self.canvas, 1, 0, 1, 3)
+        self.layout.addWidget(self.toolbar, 2, 0, 1, 3)
         
         self.run_btn = QtWidgets.QPushButton(self)
         self.run_btn.setFixedHeight(80)
-        self.layout.addWidget(self.run_btn, 2, 0)
+        self.layout.addWidget(self.run_btn, 3, 0)
         self.run_btn.setFont(font)
         self.run_btn.setObjectName("runButton")
         self.run_btn.clicked.connect(self.run_plan)
         
         self.stop_btn = QtWidgets.QPushButton(self)
         self.stop_btn.setFixedHeight(80)
-        self.layout.addWidget(self.stop_btn, 2, 1)
+        self.layout.addWidget(self.stop_btn, 3, 1)
         self.stop_btn.setFont(font)
         self.stop_btn.setObjectName("stopButton")
         
         self.commit_btn = QtWidgets.QPushButton(self)
         self.commit_btn.setFixedHeight(80)
-        self.layout.addWidget(self.commit_btn, 2, 2)
+        self.layout.addWidget(self.commit_btn, 3, 2)
         self.commit_btn.setFont(font)
         self.commit_btn.setObjectName("comitButton")
         self.commit_btn.clicked.connect(self.commit)
         
         self.plan_path = ''
         self.threadpool = QThreadPool()
+        
+        self.commit_control = None
 
         self.retranslateUi()
         self.select_plan(bluesky_path=self.config['GENERAL']['path'])
@@ -142,8 +154,8 @@ class MainWindow(QWidget):
         if self.plan_path == '':
             self.append_text('No Plan selected')
         else:
-            worker = RunProcess(path=self.plan_path, python_cmd=self.config['GENERAL']['command'])
-            worker.signals.signal.connect(self.append_text)
+            worker = RunProcess(axes =self.axes)
+            worker.signals.signal.connect(self.update)
             self.stop_btn.clicked.connect(worker.terminate)
 
             self.threadpool.start(worker)
@@ -156,21 +168,17 @@ class MainWindow(QWidget):
         except TypeError:
             print(text)
     
-    def set_signal(self, value):
-        self.testsignal.put(value)
+    def update(self, value):
+        self.canvas.draw()
+        print(value)
 
     def commit(self):
-        image_paths, ftypes = QFileDialog.getOpenFileNames(self, "Select Image File to append", "", "Image File (*.png)")
-
-        plotfiles = image_paths
+        self.attachments = []
         
-        name = self.plan_name.text()
-
-        m_date = date.today().strftime("%b-%d-%Y")
-        
-        data = "Date: {}\n Measurement: {}\n".format(m_date, name)
-
-        elogwrapper.elog_BESSYII_automeas_section_create(name, name, data, plotfiles)
+        if self.commit_control is None:
+            self.commit_control = Commit_Control(self, mode='auto', attachments=self.attachments)
+        self.commit_control.show()
+        self.commit_control.activateWindow()
         
     
 if __name__ == '__main__':
