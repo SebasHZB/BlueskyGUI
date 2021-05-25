@@ -14,20 +14,20 @@ matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
 import bluesky
-from bluesky import RunEngine
+from bluesky import RunEngine, Msg
 import bluesky.plans as bp
 import logging
 from bluesky.callbacks.stream import LiveDispatcher
-from bluesky.callbacks import LivePlot, LiveTable
+from bluesky.callbacks import LiveTable
+from bluesky.callbacks.mpl_plotting import LivePlot
 
 from bluesky.callbacks.zmq import Publisher, Proxy, RemoteDispatcher
 
 from etc.InjectionBooster import InjectionBooster
 from etc.Ophyd_Simulation import Simulation
+
         
-def foo(sim, inj):
-    #from IPython import embed
-    #embed()    
+def execute_RE(plan, sim):
     RE = RunEngine({})
     RE.log.setLevel(logging.INFO)
     
@@ -35,9 +35,9 @@ def foo(sim, inj):
     RE.subscribe(publisher)
     
     sim.start()
-    print('hier')
-    RE(bp.scan([inj], inj.offset, 0, 10, 10))
-    print('done')
+    print('Starting Scan...')
+    RE(plan)
+    print('Scan Done...')
     sim.stop()
     
 def proxy():
@@ -45,76 +45,55 @@ def proxy():
     proxy = Proxy(5567, 5568)
     proxy.start()
     
-def remote(cbs):
-    print('Starting RemoteDispatcher...')
-    remote = RemoteDispatcher(('localhost', 5568))
-    for cb in cbs:
-        remote.subscribe(cb)
-    remote.start()
-    
-    
 class ProcessLine(QObject):
     signal = pyqtSignal(object)
 
 class RunProcess(QRunnable):
     def __init__(self,*args, axes, **kwargs):
         QObject.__init__(self,*args, **kwargs)
-        self.signals = ProcessLine()
         self.axes = axes
+        self.signals = ProcessLine()
         
     @pyqtSlot()
     def run(self):
-        self.start()
+        self.sim = Simulation()
+        
+        self.device = InjectionBooster(name='booster', signal=self.sim.signal, motor=self.sim.motor)
+        print(self.device.current.name, self.device.offset.name)
+        
+        self.plan = bp.scan([self.device], self.device.offset, 0, 10, 10)
+        
+        self.lp = LivePlot(self.device.current.name, x=self.device.offset.name, ax=self.axes, marker='.')
+        
+        self.lt = LiveTable([self.device.offset, self.device.current])
+        
+        self.remote()
+        self.start_scan()
+        
+    def remote(self):
+        self.remote_dispatcher = RemoteDispatcher( ('localhost', 5568) )
+        self.remote_dispatcher.subscribe(self.lp)
+        self.remote_dispatcher.subscribe(self.lt)
+        self.remote_dispatcher.subscribe(lambda x,y: self.signals.signal.emit('update'))
+        t1 = threading.Thread(target=self.remote_dispatcher.start, daemon=True)
+        t1.start()
+        
+    def stop_remote(self):
+        self.remote_dispatcher.stop()
+        
     
-    def start(self):       
+    def start_scan(self):                  
+        self.p_proxy = mp.Process(target=proxy)
+        self.p_proxy.start()
         
-        sim = Simulation()
-        inj = InjectionBooster(name='booster', signal=sim.signal, motor=sim.motor)
+        time.sleep(1)
         
-        lp = LivePlot(inj.current.name, x=inj.offset.name, ax=self.axes, marker='.')
+        self.p_scan = mp.Process(target=execute_RE, args=[self.plan, self.sim])
+        self.p_scan.start()
         
-    
-        lt = LiveTable([inj.offset, inj.current])
+        self.p_scan.join()
+        self.terminate()
         
-        p_proxy = mp.Process(target=proxy)
-        p_proxy.start()
-        
-        p_remote = mp.Process(target=remote, args=[ [lt, lp, self.test_cb] ])
-        p_remote.start()
-        
-        p_scan= mp.Process(target=foo, args=[sim, inj])
-        p_scan.start()
-        
-        p_scan.join()
-        p_proxy.terminate()
-        p_remote.terminate()
-
-    def read(self):
-        nextline = self.process.stdout.readline()
-        ansi_escape_8bit = re.compile(
-            br'(?:\x1B[@-Z\\-_]|[\x80-\x9A\x9C-\x9F]|(?:\x1B\[|\x9B)[0-?]*[ -/]*[@-~])'
-        )
-        result = ansi_escape_8bit.sub(b'', nextline)
-        return result
-        
-        
-    def write(self, msg):
-        self.process.stdin.write(msg)
-        
-        
-    def test_cb(self, *args):
-        self.signals.signal.emit(args)
-        
-    def pause(self):
-        if self.paused:
-            self.write('RE.resume()')
-            self.paused = False
-        else:
-            self.write("RE.pause()")
-            self.paused = True
-
-
     def terminate(self):
-        self.process.stdin.close()
-        self.process.terminate()
-        self.process.wait(timeout=0.2)
+        self.p_scan.terminate()
+        self.p_proxy.terminate()

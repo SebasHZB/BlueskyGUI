@@ -154,10 +154,10 @@ class MainWindow(QWidget):
         if self.plan_path == '':
             self.append_text('No Plan selected')
         else:
-            worker = RunProcess(axes =self.axes)
+            worker = RunProcess(axes=self.axes)
             worker.signals.signal.connect(self.update)
             self.stop_btn.clicked.connect(worker.terminate)
-
+            self.stop_btn.clicked.connect(worker.stop_remote)
             self.threadpool.start(worker)
         
     def append_text(self,text):
@@ -169,9 +169,8 @@ class MainWindow(QWidget):
             print(text)
     
     def update(self, value):
-        self.canvas.draw()
-        print(value)
-
+        print('Klappt')
+        
     def commit(self):
         self.attachments = []
         
