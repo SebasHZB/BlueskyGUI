@@ -103,7 +103,8 @@ class RunProcess(QRunnable):
         
         time.sleep(2)
         
-        self.p_scan = mp.Process(target=execute_RE, args=[self.thing.PLANS[0]])
+        #self.p_scan = mp.Process(target=execute_RE, args=[self.thing.PLANS[0]])
+        self.p_scan = mp.Process(target=self.thing.run_plans, args=[])
         self.p_scan.start()
         
         self.p_scan.join()
