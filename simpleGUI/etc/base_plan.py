@@ -10,6 +10,9 @@ class Base_Plan():
     PLANS = []
     PRINTERS = []
     PRINT_CALLBACK = print
+    AXIS = None
+    NAMES = {}
+    CUR_AX = None
     
     def __init__(self):
         pass

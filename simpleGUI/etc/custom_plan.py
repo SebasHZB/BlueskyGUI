@@ -1,64 +1,76 @@
-from bluesky.plan_stubs import checkpoint, abs_set, trigger_and_read
-import bluesky.plans as bp
-from bluesky.callbacks import LivePlot, LiveTable
+#from etc.InjectionBooster import InjectionBooster
 
-from etc.InjectionBooster import InjectionBooster
 from etc.base_plan import Base_Plan
 
-from ophyd.sim import FakeEpicsSignal
-
-
 class Custom_Plan(Base_Plan):
-    
+
     def __init__(self):
-        super()
-    
+        super()#.__init__()
+
     def describe_devices(self):
-        self.DEVICES['Injection_Booster'] = InjectionBooster(name='booster')
+        from bact2.ophyd.devices.raw.kicker_offset_v2 import InjectionBooster
+        from bact2.ophyd.devices.raw.kicker_offset import InjectionBooster, BoosterCurrent, ForceAboveZero, AverageValue
+
+        self.DEVICES['inj_kicker'] = InjectionBooster(name='booster')
+        self.DEVICES['booster_current'] = BoosterCurrent(name='booster_cur')
+        self.DEVICES['abvz'] = ForceAboveZero(name='abvz', signal_to_process=self.DEVICES['booster_current'].current)
+        self.DEVICES['bca'] = AverageValue(name='bca', signal_to_process=self.DEVICES['booster_current'].current)
+
+        self.NAMES['inj_kicker'] = self.DEVICES['inj_kicker'].offset.name
+        self.NAMES['booster_current'] = self.DEVICES['booster_current'].current.name
+        self.NAMES['bca'] = self.DEVICES['bca'].mean.name
         
+
     def describe_plans(self):
-        self.PLANS.append(custom_scan([self.DEVICES['Injection_Booster'].current], self.DEVICES['Injection_Booster'].offset, 
-                                             0, 10, 10))
+
+        from bluesky import RunEngine
+        import bluesky.plans as bp
+        from bluesky.callbacks.fitting import PeakStats
+        from bact2.ophyd.utils.preprocessors.CounterSink import CounterSink
+
+        b_cur = self.DEVICES['booster_current'].current
         
+        cs = CounterSink(name = "cnt_b_cur", delay = .1)
+
+        dep = self.DEVICES['bca'].mean.name
+        indep = self.DEVICES['inj_kicker'].offset
+        
+        md = {
+            'nikname' : 'injection_kicker_scan_adaptive'
+        }
+
+        start, end = 10, 13
+        min_step = 0.01
+        max_step = 0.15
+        min_change = 1
+
+        dets = [ self.DEVICES['inj_kicker'], self.DEVICES['booster_current'], self.DEVICES['abvz'], self.DEVICES['bca'] ]
+        
+        plan = bp.adaptive_scan(dets, dep, indep, start, end, min_step, max_step, min_change, False, md=md)
+
+        self.PLANS.append(plan)
+
+        start, end = 11, 12
+        steps = 30
+
+        plan2 = bp.scan(dets, indep, start, end, steps)
+
+        self.PLANS.append(plan2)
+
+
     def describe_printers(self):
-        table = LiveTable([self.DEVICES['Injection_Booster'].offset, self.DEVICES['Injection_Booster'].current],
+        from bluesky.callbacks import LiveTable
+        
+        #markdown table
+        table = LiveTable([self.NAMES['inj_kicker'], self.NAMES['booster_current']],
                           out=self.PRINT_CALLBACK)
         self.PRINTERS.append(table)
+
+    def describe_plots(self):
+        from bluesky.callbacks import LivePlot
         
-    def describe_plots(self, axis):      
-        cur_name = self.DEVICES['Injection_Booster'].current.name
-        off_name = self.DEVICES['Injection_Booster'].offset.name
-        self.PLOTS.append(LivePlot(cur_name, x=off_name, ax=axis, marker='.'))
-
-def custom_step(detectors, motor, step):
-    """
-    Inner loop of a 1D step scan
-
-    This is the default function for ``per_step`` param in 1D plans.
-    """
-    yield from checkpoint()
-    yield from abs_set(motor, step, wait=True)
-    return (yield from trigger_and_read(list(detectors) + [motor]))
-
-def custom_scan(detectors, motor, start, stop, step):
-    yield from bp.scan(detectors, motor, start, stop, step)
-    
-def custom_plan(sim):
-    device = InjectionBooster(name='booster', signal=sim.signal, motor=sim.motor)
-    yield from bp.scan([device], device.offset, 0, 10, 10)
-    
-    
-    
-    
-if __name__ == '__main__':
-    from bluesky import RunEngine
-    sim = Simulation()
-    RE = RunEngine({})
-    RE.subscribe(print)
-    
-    sim.start()
-    
-    plan = custom_plan(sim)
-    RE(plan)
-    sim.stop()
-    
+        cur_name = self.NAMES['booster_current']
+        off_name = self.NAMES['inj_kicker']
+        mean_name = self.NAMES['bca']
+        self.PLOTS.append(LivePlot(cur_name, x=off_name, ax=self.AXIS[0], marker='.'))
+        self.PLOTS.append(LivePlot(mean_name, x=off_name, ax=self.AXIS[1], marker='.'))

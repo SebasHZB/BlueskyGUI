@@ -2,7 +2,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import multiprocessing as mp
-import signal
+# import signal
 import re
 import sys
 import time
@@ -16,36 +16,27 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
-import bluesky
-from bluesky import RunEngine, Msg
-import bluesky.plans as bp
+# import bluesky
+# from bluesky import RunEngine, Msg
+# import bluesky.plans as bp
 import logging
-from bluesky.callbacks.stream import LiveDispatcher
+# from bluesky.callbacks.stream import LiveDispatcher
 from bluesky.callbacks import LiveTable
 from bluesky.callbacks.mpl_plotting import LivePlot
 
 from bluesky.callbacks.zmq import Publisher, Proxy, RemoteDispatcher
 
-from etc.InjectionBooster import InjectionBooster
+#from etc.InjectionBooster import InjectionBooster
 from etc.custom_plan import Custom_Plan
 
-from ophyd.sim import FakeEpicsSignal
+# from ophyd.sim import FakeEpicsSignal
         
-def execute_RE(plans):
-    RE = RunEngine({})
-    RE.log.setLevel(logging.DEBUG)
-    
-    file_handler = logging.FileHandler('bluesky.log')
-    logger = logging.getLogger('bluesky')
-    logger.addHandler(file_handler)
-    file_handler.setLevel(logging.DEBUG)
-    
-    publisher = Publisher('localhost:5567')
-    RE.subscribe(publisher)
-    
-    print('Starting Scan...')
-    RE(plans)
-    print('Scan Done...')
+def execute_RE(thing, out_q, in_q):
+    thing.describe_devices()
+    thing.describe_plans()
+    out_q.put(thing.NAMES)
+    in_q.get()
+    thing.run_plans()
     
 def proxy():
     print('Starting Proxy...')
@@ -59,8 +50,8 @@ class RunProcess(QRunnable):
     def __init__(self,*args, path, plan_name, axes, **kwargs):
         QObject.__init__(self,*args, **kwargs)
         
-        spec = importlib.util.spec_from_file_location(plan_name, path)
-        self.plan = spec.loader.load_module()
+        #spec = importlib.util.spec_from_file_location(plan_name, path)
+        #self.plan = spec.loader.load_module()
         
         self.axes = axes
         self.signals = ProcessLine()
@@ -73,15 +64,33 @@ class RunProcess(QRunnable):
         
         self.thing = Custom_Plan()
         self.thing.PRINT_CALLBACK = self.signals.signal.emit
-        self.thing.describe_devices()
+        self.thing.AXIS = self.axes
+        #self.thing.describe_devices()
+        #self.thing.describe_printers()
+        #self.thing.describe_plans()
+        #self.thing.describe_plots(self.axes)
+        
+        #self.lt = LiveTable(['booster_offset', 'booster_cur_current'], out=self.signals.signal.emit)
+        #self.lp = LivePlot('booster_cur_current', x='booster_offset', ax=self.axes, marker='.')
+
+        in_q = mp.Queue()
+        out_q = mp.Queue()
+
+        self.p_scan = mp.Process(target=execute_RE, args=[self.thing, out_q, in_q])
+        self.p_scan.start()
+
+        self.thing.NAMES = out_q.get()
+        
         self.thing.describe_printers()
-        self.thing.describe_plans()
-        self.thing.describe_plots(self.axes)
-        
-        #self.lt = LiveTable([self.device.offset, self.device.current], out=self.signals.signal.emit)
-        
+        self.thing.describe_plots()
         self.remote()
-        self.start_scan()
+        self.p_proxy = mp.Process(target=proxy)
+        self.p_proxy.start()
+        time.sleep(2)
+        in_q.put('start scan')
+
+        self.p_scan.join()
+        self.terminate()
         
     def remote(self):
         self.remote_dispatcher = RemoteDispatcher( ('localhost', 5568) )
@@ -95,20 +104,7 @@ class RunProcess(QRunnable):
             self.remote_dispatcher.subscribe(plot)
             
         t1 = threading.Thread(target=self.remote_dispatcher.start, daemon=True)
-        t1.start()        
-    
-    def start_scan(self):                  
-        self.p_proxy = mp.Process(target=proxy)
-        self.p_proxy.start()
-        
-        time.sleep(2)
-        
-        #self.p_scan = mp.Process(target=execute_RE, args=[self.thing.PLANS[0]])
-        self.p_scan = mp.Process(target=self.thing.run_plans, args=[])
-        self.p_scan.start()
-        
-        self.p_scan.join()
-        self.terminate()
+        t1.start()                
         
     def terminate(self):
         self.p_scan.terminate()

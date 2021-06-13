@@ -20,19 +20,19 @@ import os
 import multiprocessing as mp
 import random
 import time
-from ophyd.sim import FakeEpicsSignal
+# from ophyd.sim import FakeEpicsSignal
 import sys
 from contextlib import redirect_stdout
-from bluesky import RunEngine
+# from bluesky import RunEngine
 import logging
 import bluesky as bs
-from databroker import Broker
-from bluesky.callbacks import LivePlot, LiveTable
-import bluesky.plans as bp
+# from databroker import Broker
+# from bluesky.callbacks import LivePlot, LiveTable
+# import bluesky.plans as bp
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-import signal
+# import signal
 import configparser
 from datetime import date
 
@@ -74,7 +74,7 @@ class MainWindow(QWidget):
         self.plan_select.setObjectName("planSelect")
         self.plan_select.clicked.connect(self.select_plan)
         
-        self.figure, self.axes = plt.subplots(1, 1, figsize=[12,8])
+        self.figure, self.axes = plt.subplots(2, 1, figsize=[12,8], sharex=True)
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.layout.addWidget(self.canvas, 1, 0, 1, 3)
