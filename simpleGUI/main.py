@@ -22,6 +22,7 @@ import random
 import time
 from ophyd.sim import FakeEpicsSignal
 import sys
+from contextlib import redirect_stdout
 from bluesky import RunEngine
 import logging
 import bluesky as bs
@@ -73,32 +74,33 @@ class MainWindow(QWidget):
         self.plan_select.setObjectName("planSelect")
         self.plan_select.clicked.connect(self.select_plan)
         
-        #self.output = QtWidgets.QTextEdit(self)
-        #self.layout.addWidget(self.output, 1, 0, 1, 3)
-        #self.output.setObjectName("outputGraph")
-        
         self.figure, self.axes = plt.subplots(1, 1, figsize=[12,8])
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.layout.addWidget(self.canvas, 1, 0, 1, 3)
         self.layout.addWidget(self.toolbar, 2, 0, 1, 3)
         
+        self.output = QtWidgets.QTextEdit(self)
+        self.output.setFixedHeight(200)
+        self.layout.addWidget(self.output, 3, 0, 1, 3)
+        self.output.setObjectName("outputBox")
+        
         self.run_btn = QtWidgets.QPushButton(self)
         self.run_btn.setFixedHeight(80)
-        self.layout.addWidget(self.run_btn, 3, 0)
+        self.layout.addWidget(self.run_btn, 4, 0)
         self.run_btn.setFont(font)
         self.run_btn.setObjectName("runButton")
         self.run_btn.clicked.connect(self.run_plan)
         
         self.stop_btn = QtWidgets.QPushButton(self)
         self.stop_btn.setFixedHeight(80)
-        self.layout.addWidget(self.stop_btn, 3, 1)
+        self.layout.addWidget(self.stop_btn, 4, 1)
         self.stop_btn.setFont(font)
         self.stop_btn.setObjectName("stopButton")
         
         self.commit_btn = QtWidgets.QPushButton(self)
         self.commit_btn.setFixedHeight(80)
-        self.layout.addWidget(self.commit_btn, 3, 2)
+        self.layout.addWidget(self.commit_btn, 4, 2)
         self.commit_btn.setFont(font)
         self.commit_btn.setObjectName("comitButton")
         self.commit_btn.clicked.connect(self.commit)
@@ -154,22 +156,21 @@ class MainWindow(QWidget):
         if self.plan_path == '':
             self.append_text('No Plan selected')
         else:
-            worker = RunProcess(axes=self.axes)
-            worker.signals.signal.connect(self.update)
-            self.stop_btn.clicked.connect(worker.terminate)
-            self.stop_btn.clicked.connect(worker.stop_remote)
-            self.threadpool.start(worker)
+            self.worker = RunProcess(path=self.plan_path,plan_name=self.plan_name.text(), axes=self.axes)
+            self.worker.signals.signal.connect(self.update)
+            self.worker.signals.signal.connect(self.append_text)
+            self.stop_btn.clicked.connect(self.worker.close_worker)
+            self.threadpool.start(self.worker)
         
     def append_text(self,text):
         self.output.moveCursor(QTextCursor.End)
-        msg = QTextCodec.codecForLocale().toUnicode(text)
         try:
-            self.output.insertPlainText( msg )
+            self.output.insertPlainText( text + '\n' )
         except TypeError:
             print(text)
     
     def update(self, value):
-        print('Klappt')
+        pass
         
     def commit(self):
         self.attachments = []
@@ -178,6 +179,16 @@ class MainWindow(QWidget):
             self.commit_control = Commit_Control(self, mode='auto', attachments=self.attachments)
         self.commit_control.show()
         self.commit_control.activateWindow()
+        
+        
+     
+    def closeEvent(self, event):
+        # do stuff
+        try:
+            self.worker.close_worker()
+        except AttributeError:
+            pass
+        event.accept()
         
     
 if __name__ == '__main__':
