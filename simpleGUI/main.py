@@ -20,23 +20,16 @@ import os
 import multiprocessing as mp
 import random
 import time
-# from ophyd.sim import FakeEpicsSignal
 import sys
 from contextlib import redirect_stdout
-# from bluesky import RunEngine
 import logging
 import bluesky as bs
-# from databroker import Broker
-# from bluesky.callbacks import LivePlot, LiveTable
-# import bluesky.plans as bp
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-# import signal
 import configparser
-from datetime import date
+from datetime import datetime
 
-#from process_executer import RunProcess
 from multiprocess_executer import RunProcess
 from commit_control import Commit_Control
 
@@ -176,7 +169,18 @@ class MainWindow(QWidget):
         self.attachments = []
         
         if self.commit_control is None:
-            self.commit_control = Commit_Control(self, mode='auto', attachments=self.attachments)
+            self.commit_control = Commit_Control(self, mode='auto')
+            scan = self.plan_name.text()
+            author = self.config['GENERAL']['author']
+            
+            now = datetime.now()
+            
+            scan_date = now.strftime("%B %d, %Y, %H:%M:%S")
+            
+            description = scan_date + '\n' + scan
+            
+            self.commit_control.quick_fill(scan_name=scan, author_name=author, description=description)
+            
         self.commit_control.show()
         self.commit_control.activateWindow()
         

@@ -3,14 +3,13 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-from bact.applib.elogwrapper import elogwrapper
+#from bact.applib.elogwrapper import elogwrapper
 
 class Commit_Control(QMainWindow):
     
-    def __init__(self, *args, mode='manual', attachments=[], **kwargs):
+    def __init__(self, *args, mode='manual', **kwargs):
         super(Commit_Control, self).__init__(*args, **kwargs)
         self.mode = mode
-        self.attachments = attachments
         
         self.main = QtWidgets.QWidget()
         self.main.resize(400, 600)
@@ -38,9 +37,9 @@ class Commit_Control(QMainWindow):
         
         self.author_name = QtWidgets.QLabel(self)
         self.layout.addWidget(self.author_name, 2, 0, 1, 3)
-        self.scan_name.setFont(label_font)
-        self.scan_name.setAlignment(QtCore.Qt.AlignCenter)
-        self.scan_name.setObjectName("authorName")
+        self.author_name.setFont(label_font)
+        self.author_name.setAlignment(QtCore.Qt.AlignCenter)
+        self.author_name.setObjectName("authorName")
         
         self.author_input = QtWidgets.QLineEdit()
         self.layout.addWidget(self.author_input, 3, 0, 1, 3)
@@ -48,9 +47,9 @@ class Commit_Control(QMainWindow):
         
         self.descr_name = QtWidgets.QLabel(self)
         self.layout.addWidget(self.descr_name, 4, 0, 1, 3)
-        self.scan_name.setFont(label_font)
-        self.scan_name.setAlignment(QtCore.Qt.AlignCenter)
-        self.scan_name.setObjectName("descriptionName")
+        self.descr_name.setFont(label_font)
+        self.descr_name.setAlignment(QtCore.Qt.AlignCenter)
+        self.descr_name.setObjectName("descriptionName")
         
         self.description = QtWidgets.QTextEdit(self)
         self.layout.addWidget(self.description, 5, 0, 1, 3)
@@ -58,9 +57,9 @@ class Commit_Control(QMainWindow):
         
         self.attachment_name = QtWidgets.QLabel(self)
         self.layout.addWidget(self.attachment_name, 6, 0, 1, 3)
-        self.scan_name.setFont(label_font)
-        self.scan_name.setAlignment(QtCore.Qt.AlignCenter)
-        self.scan_name.setObjectName("attachmentName")
+        self.attachment_name.setFont(label_font)
+        self.attachment_name.setAlignment(QtCore.Qt.AlignCenter)
+        self.attachment_name.setObjectName("attachmentName")
         
         self.attachment_list = QtWidgets.QListWidget(self)
         self.layout.addWidget(self.attachment_list, 7, 0, 2, 1)
@@ -116,6 +115,14 @@ class Commit_Control(QMainWindow):
         self.remove_btn.setText('Remove')
         self.commit_btn.setText('Commit')
         
+    def quick_fill(self, scan_name='', author_name='', description='', attachments=[]):
+        self.name_input.setText(scan_name)
+        self.author_input.setText(author_name)
+        self.description.setText(description)
+        
+        for att in attachments:
+            print(att)
+        
     def add_attachment(self):
         image_paths, ftypes = QFileDialog.getOpenFileNames(self, "Select Image File to append", "", "Image File (*.png)")
         
@@ -157,7 +164,9 @@ class Commit_Control(QMainWindow):
             
         print('Scan Name: {}\nAuthor: {}\nDescription: {}\nAttachments: {}'.format(name, author, description, attachments))
         
-        elogwrapper.elog_BESSYII_automeas_section_create(name, author, description, attachments)
+        #elogwrapper.elog_BESSYII_automeas_section_create(name, author, description, attachments)
+        
+        self.close()
        
         
         
