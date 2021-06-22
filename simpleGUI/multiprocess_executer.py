@@ -61,6 +61,7 @@ class RunProcess(QRunnable):
         self.p_scan.start()
 
         self.plan.NAMES = out_q.get()
+        print(self.plan.NAMES)
         
         self.plan.describe_printers()
         self.plan.describe_plots()

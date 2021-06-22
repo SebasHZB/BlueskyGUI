@@ -56,3 +56,4 @@ class Custom_Plan(Base_Plan):
         cur_name = self.NAMES['current']
         off_name = self.NAMES['offset']
         self.PLOTS.append(LivePlot(cur_name, x=off_name, ax=self.AXIS[0], marker='.'))
+        self.PLOTS.append(LivePlot(cur_name, x=off_name, ax=self.AXIS[1], marker='.'))
