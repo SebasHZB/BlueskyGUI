@@ -3,7 +3,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-#from bact.applib.elogwrapper import elogwrapper
+from bact.applib.elogwrapper import elogwrapper
 
 class Commit_Control(QMainWindow):
     
@@ -164,7 +164,7 @@ class Commit_Control(QMainWindow):
             
         print('Scan Name: {}\nAuthor: {}\nDescription: {}\nAttachments: {}'.format(name, author, description, attachments))
         
-        #elogwrapper.elog_BESSYII_automeas_section_create(name, author, description, attachments)
+        elogwrapper.elog_BESSYII_automeas_section_create(name, author, description, attachments)
         
         self.close()
        

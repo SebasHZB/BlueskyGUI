@@ -22,8 +22,9 @@ from bluesky.callbacks.mpl_plotting import LivePlot
 from bluesky.callbacks.zmq import Publisher, Proxy, RemoteDispatcher
 
 #from etc.custom_plan import Custom_Plan
-from etc.simulation_plan import Custom_Plan
-        
+#from etc.simulation_plan import Custom_Plan
+from etc.custom_plan2 import Custom_Plan
+
 def execute_RE(thing, out_q, in_q):
     thing.describe_devices()
     thing.describe_plans()
