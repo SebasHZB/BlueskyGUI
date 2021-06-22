@@ -20,6 +20,7 @@ from bluesky.callbacks import LiveTable
 from bluesky.callbacks.mpl_plotting import LivePlot
 
 from bluesky.callbacks.zmq import Publisher, Proxy, RemoteDispatcher
+from databroker import catalog
 
 #from etc.custom_plan import Custom_Plan
 #from etc.simulation_plan import Custom_Plan
@@ -83,7 +84,11 @@ class RunProcess(QRunnable):
             
         for plot in self.plan.PLOTS:
             self.remote_dispatcher.subscribe(plot)
-            
+
+        # db = Broker.named('light')
+        cat = catalog['light']
+        self.remote_dispatcher.subscribe(cat.v1.insert)
+
         t1 = threading.Thread(target=self.remote_dispatcher.start, daemon=True)
         t1.start()                
         
