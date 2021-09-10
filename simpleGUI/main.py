@@ -137,13 +137,15 @@ class MainWindow(QWidget):
             if not ftype:
                 return
         try:
-            path = ntpath.abspath(bluesky_path)
+            self.plan_path = bluesky_path
         except NameError as n:
             print(n)
             sys.exit()
-        folder, file = ntpath.split(path)
-        self.plan_name.setText(file.split('.')[0])
-        self.plan_path = bluesky_path
+        
+        try:
+            self.worker.set_plan(self.plan_path, self.plan_name.text())
+        except AttributeError as e:
+            pass
         
     def run_plan(self):
         if self.plan_path == '':
@@ -153,7 +155,11 @@ class MainWindow(QWidget):
             self.worker.signals.signal.connect(self.update)
             self.worker.signals.signal.connect(self.append_text)
             self.stop_btn.clicked.connect(self.worker.close_worker)
+            self.stop_btn.clicked.connect(self.stop_worker)
             self.threadpool.start(self.worker)
+            
+    def stop_worker(self):
+        self.threadpool.cancel(self.worker)
         
     def append_text(self,text):
         self.output.moveCursor(QTextCursor.End)

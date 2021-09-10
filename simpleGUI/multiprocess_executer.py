@@ -8,6 +8,7 @@ import time
 import os
 
 import importlib
+import importlib.machinery
 
 import threading
 
@@ -23,15 +24,15 @@ from bluesky.callbacks.zmq import Publisher, Proxy, RemoteDispatcher
 from databroker import catalog
 
 #from etc.custom_plan import Custom_Plan
-#from etc.simulation_plan import Custom_Plan
-from etc.custom_plan2 import Custom_Plan
+from etc.simulation_plan import Custom_Plan
+#from etc.custom_plan2 import Custom_Plan
 
-def execute_RE(thing, out_q, in_q):
-    thing.describe_devices()
-    thing.describe_plans()
-    out_q.put(thing.NAMES)
+def execute_RE(plan_file, out_q, in_q):
+    plan_file.describe_devices()
+    plan_file.describe_plans()
+    out_q.put(plan_file.NAMES)
     in_q.get()
-    thing.run_plans()
+    plan_file.run_plans()
     
 def proxy():
     print('Starting Proxy...')
@@ -44,7 +45,8 @@ class ProcessLine(QObject):
 class RunProcess(QRunnable):
     def __init__(self,*args, path, plan_name, axes, **kwargs):
         QObject.__init__(self,*args, **kwargs)
-        
+        self.path = path
+        self.plan_name = plan_name
         self.axes = axes
         self.signals = ProcessLine()
         
@@ -52,7 +54,8 @@ class RunProcess(QRunnable):
     def run(self):        
         #self.lp = LivePlot(self.device.current.name, x=self.device.offset.name, ax=self.axes, marker='.')
         
-        self.plan = Custom_Plan()
+        self.set_plan(self.path)
+        #self.plan = Custom_Plan()
         self.plan.PRINT_CALLBACK = self.signals.signal.emit
         self.plan.AXIS = self.axes
 
@@ -86,11 +89,25 @@ class RunProcess(QRunnable):
             self.remote_dispatcher.subscribe(plot)
 
         # db = Broker.named('light')
-        cat = catalog['light']
-        self.remote_dispatcher.subscribe(cat.v1.insert)
+        #cat = catalog['light']
+        #self.remote_dispatcher.subscribe(cat.v1.insert)
 
         t1 = threading.Thread(target=self.remote_dispatcher.start, daemon=True)
-        t1.start()                
+        t1.start()
+        
+    def set_plan(self, path):
+        self.plan = self.load_plan(self.path)()
+        
+    def load_plan(self, path):
+        print(path)
+        
+        loader = importlib.machinery.SourceFileLoader("Custom_Plan", path)
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        mod = importlib.util.module_from_spec(spec)
+        loader.exec_module(mod)
+        plan = getattr(mod, 'Custom_Plan')
+        
+        return plan
         
     def terminate(self):
         self.p_scan.terminate()
@@ -99,4 +116,3 @@ class RunProcess(QRunnable):
     def close_worker(self):
         self.remote_dispatcher.stop()
         self.terminate()
-        print('Dinge')
