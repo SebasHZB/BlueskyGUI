@@ -15,12 +15,16 @@ from PyQt5.QtCore import *
 
 import ntpath
 
+import importlib
+import importlib.machinery
+
 import threading
 import os
 import multiprocessing as mp
 import random
 import time
 import sys
+import gc
 from contextlib import redirect_stdout
 import logging
 import bluesky as bs
@@ -32,6 +36,8 @@ from datetime import datetime
 
 from multiprocess_executer import RunProcess
 from commit_control import Commit_Control
+from etc.zmq_proxy import Proxy_Worker
+from etc.zmq_dispatcher import Dispatch_Worker
 
 _EXPECTED_SECTIONS = ['GENERAL', 'PYTHON', 'LAYOUT']   
 
@@ -67,7 +73,7 @@ class MainWindow(QWidget):
         self.plan_select.setObjectName("planSelect")
         self.plan_select.clicked.connect(self.select_plan)
         
-        self.figure, self.axes = plt.subplots(2, 1, figsize=[12,8], sharex=True)
+        self.figure, self.axes = plt.subplots(1, 1, figsize=[12,8], sharex=True)
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.layout.addWidget(self.canvas, 1, 0, 1, 3)
@@ -90,6 +96,7 @@ class MainWindow(QWidget):
         self.layout.addWidget(self.stop_btn, 4, 1)
         self.stop_btn.setFont(font)
         self.stop_btn.setObjectName("stopButton")
+        self.stop_btn.clicked.connect(self.stop_plan)
         
         self.commit_btn = QtWidgets.QPushButton(self)
         self.commit_btn.setFixedHeight(80)
@@ -99,9 +106,17 @@ class MainWindow(QWidget):
         self.commit_btn.clicked.connect(self.commit)
         
         self.plan_path = ''
-        self.threadpool = QThreadPool()
-        
+
         self.commit_control = None
+
+        self.proxy_worker = Proxy_Worker(portIN=5567, portOUT=5568)
+        self.proxy_worker.setTerminationEnabled(True)
+        self.proxy_worker.start()
+
+        self.dispatch_worker = Dispatch_Worker(axis=self.axes, address='localhost', port=5568)
+        self.dispatch_worker.setTerminationEnabled(True)
+        self.dispatch_worker.signals.signal.connect(self.append_text)
+        self.dispatch_worker.start()
 
         self.retranslateUi()
         self.select_plan(bluesky_path=self.config['GENERAL']['path'])
@@ -138,38 +153,54 @@ class MainWindow(QWidget):
                 return
         try:
             self.plan_path = bluesky_path
+            self.plan_name.setText(QUrl.fromLocalFile(bluesky_path).fileName())
         except NameError as n:
             print(n)
             sys.exit()
+
+        print('Loading plan at: ', self.plan_path)
         
-        try:
-            self.worker.set_plan(self.plan_path, self.plan_name.text())
-        except AttributeError as e:
-            pass
+        loader = importlib.machinery.SourceFileLoader("Custom_Plan", self.plan_path)
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        mod = importlib.util.module_from_spec(spec)
+        loader.exec_module(mod)
+        plan_file = getattr(mod, 'Custom_Plan')
+        self.plan_obj = plan_file()
+
         
     def run_plan(self):
         if self.plan_path == '':
             self.append_text('No Plan selected')
-        else:
-            self.worker = RunProcess(path=self.plan_path,plan_name=self.plan_name.text(), axes=self.axes)
-            self.worker.signals.signal.connect(self.update)
+        else:            
+            self.axes.cla()
+            self.dispatch_worker.clear_callbacks()
+            self.dispatch_worker.setup_plan(self.plan_obj)
+
+            self.worker = RunProcess()
+            self.worker.set_plan(self.plan_obj)
+            self.worker.signals.names.connect(self.receive_names)
             self.worker.signals.signal.connect(self.append_text)
-            self.stop_btn.clicked.connect(self.worker.close_worker)
-            self.stop_btn.clicked.connect(self.stop_worker)
-            self.threadpool.start(self.worker)
-            
-    def stop_worker(self):
-        self.threadpool.cancel(self.worker)
-        
+            self.worker.start()
+
+    def stop_plan(self):
+        print('Interrupting Scan...')
+        try:
+            self.worker.close_worker()
+            #self.worker.quit()
+            #self.worker.wait()
+        except AttributeError as e:
+            print(e)
+
+    def receive_names(self, names):
+        self.dispatch_worker.set_names(names, self.axes)
+        self.worker.send_to_process('Ready')
+
     def append_text(self,text):
         self.output.moveCursor(QTextCursor.End)
         try:
             self.output.insertPlainText( text + '\n' )
         except TypeError:
             print(text)
-    
-    def update(self, value):
-        pass
         
     def commit(self):
         self.attachments = []
@@ -194,10 +225,16 @@ class MainWindow(QWidget):
      
     def closeEvent(self, event):
         # do stuff
+        self.stop_plan()
         try:
-            self.worker.close_worker()
-        except AttributeError:
-            pass
+            self.proxy_worker.stop()
+        except AttributeError as e:
+            print('Proxy Worker: ', e)
+        
+        try:
+            self.dispatch_worker.stop()
+        except AttributeError as e:
+            print('Dispatch Worker: ', e)
         event.accept()
         
     
