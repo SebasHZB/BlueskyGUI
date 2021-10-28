@@ -35,25 +35,24 @@ class Custom_Plan(Base_Plan):
         self.PLANS.append(plan)
 
         start, end = 11, 12
-        steps = 30
+        steps = 10
 
         plan2 = bp.scan(dets, indep, start, end, steps)
 
         self.PLANS.append(plan2)
 
 
-    def describe_printers(self):
+    def describe_printers(self, cb):
         from bluesky.callbacks import LiveTable
         
         #markdown table
         table = LiveTable([self.NAMES['offset'], self.NAMES['current']],
-                          out=self.PRINT_CALLBACK)
+                          out=cb)
         self.PRINTERS.append(table)
 
-    def describe_plots(self):
+    def describe_plots(self, axes):
         from bluesky.callbacks import LivePlot
         
         cur_name = self.NAMES['current']
         off_name = self.NAMES['offset']
-        self.PLOTS.append(LivePlot(cur_name, x=off_name, ax=self.AXIS[0], marker='.'))
-        self.PLOTS.append(LivePlot(cur_name, x=off_name, ax=self.AXIS[1], marker='.'))
+        self.PLOTS.append(LivePlot(cur_name, x=off_name, ax=axes, marker='.'))

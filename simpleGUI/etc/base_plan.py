@@ -2,6 +2,7 @@ from bluesky import RunEngine
 from bluesky.callbacks import LivePlot
 from bluesky.callbacks.zmq import Publisher
 import logging
+import time
 
 class Base_Plan():
     
@@ -40,6 +41,7 @@ class Base_Plan():
             print('Starting Scan...')
             RE(plan)
             print('Scan Done...')
+            time.sleep(1)
             
         
     
