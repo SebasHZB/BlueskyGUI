@@ -31,14 +31,13 @@ class Dispatch_Worker(QThread):
 
     def setup_plan(self, plan):
         self.plan = plan
-        self.plan.PRINT_CALLBACK = self.signals.signal.emit
     
     def set_names(self, names, axis):
         self.plan.NAMES = names
         self.plan.PRINTERS = []
         self.plan.PLOTS = []
         self.plots = []
-        self.plan.describe_printers()
+        self.plan.describe_printers(self.signals.signal.emit)
         self.plan.describe_plots(axis)
 
         for printer in self.plan.PRINTERS:
@@ -46,7 +45,6 @@ class Dispatch_Worker(QThread):
         
         for plot in self.plan.PLOTS:
             self.add_callback(plot)
-
     
     def stop(self):
         self.terminate()

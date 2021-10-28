@@ -42,12 +42,12 @@ class Custom_Plan(Base_Plan):
         self.PLANS.append(plan2)
 
 
-    def describe_printers(self):
+    def describe_printers(self, cb):
         from bluesky.callbacks import LiveTable
         
         #markdown table
         table = LiveTable([self.NAMES['offset'], self.NAMES['current']],
-                          out=self.PRINT_CALLBACK)
+                          out=cb)
         self.PRINTERS.append(table)
 
     def describe_plots(self, axes):
